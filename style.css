@@ -98,3 +98,68 @@ html, body {
     background: #06121c;
     color: #d6f1ff;
 }
+
+#category-panel {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 16px;
+    background: rgba(8, 14, 22, 0.78);
+    border: 1px solid rgba(0, 220, 255, 0.45);
+    border-radius: 4px;
+    box-shadow: 0 0 18px rgba(0, 180, 255, 0.18), inset 0 0 12px rgba(0, 100, 160, 0.15);
+    font-family: 'Courier New', Consolas, 'Lucida Console', monospace;
+    backdrop-filter: blur(2px);
+}
+
+#category-panel .cat-label {
+    color: #00e5ff;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(0, 220, 255, 0.3);
+    margin-bottom: 4px;
+}
+
+#category-panel .cat-btn {
+    background: rgba(0, 20, 35, 0.85);
+    color: #d6f1ff;
+    border: 1px solid rgba(0, 220, 255, 0.4);
+    border-radius: 3px;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s;
+    outline: none;
+}
+
+#category-panel .cat-btn:hover {
+    border-color: #00e5ff;
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(0, 220, 255, 0.6), inset 0 0 6px rgba(0, 220, 255, 0.2);
+}
+
+#category-panel .cat-btn:active {
+    background: rgba(0, 60, 90, 0.85);
+}
+
+#category-panel .cat-btn.active {
+    background: rgba(0, 80, 120, 0.85);
+    border-color: #00e5ff;
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(0, 220, 255, 0.5);
+}
+
+#category-panel .cat-btn:disabled {
+    opacity: 0.4;
+    cursor: wait;
+}

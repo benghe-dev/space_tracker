@@ -20,8 +20,14 @@ const viewer = new Cesium.Viewer('cesiumContainer', {
 
 viewer.clock.shouldAnimate = true;
 
-const TLE_URL = 'https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=tle';
+const CATEGORY_URLS = {
+    stations: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle',
+    visual: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=tle',
+    gps: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=gps-ops&FORMAT=tle'
+};
+const DEFAULT_CATEGORY = 'stations';
 const ORBIT_WINDOW_MIN = 186;
+const EARTH_RADIUS_M = 6371000;
 const NUM_SEGMENTS = 12;
 const MIN_PER_SEGMENT = ORBIT_WINDOW_MIN / NUM_SEGMENTS;
 const MIN_ALPHA = 0.05;
@@ -41,6 +47,7 @@ const telLon = document.getElementById('tel-lon');
 const telAlt = document.getElementById('tel-alt');
 const telVel = document.getElementById('tel-vel');
 const satelliteSelector = document.getElementById('satellite-selector');
+const categoryButtons = document.querySelectorAll('#category-panel .cat-btn');
 
 const satEntity = viewer.entities.add({
     name: 'Satellite',
@@ -59,6 +66,31 @@ const satEntity = viewer.entities.add({
         showBackground: true,
         backgroundColor: new Cesium.Color(0, 0, 0, 0.6)
     }
+});
+
+const footprintRadiusCallback = new Cesium.CallbackProperty((time) => {
+    if (!satEntity || !satEntity.position) return 1;
+    const pos = satEntity.position.getValue(time);
+    if (!pos) return 1;
+    const cartographic = Cesium.Cartographic.fromCartesian(pos);
+    if (!cartographic) return 1;
+    const altitude = cartographic.height;
+    if (!Number.isFinite(altitude) || altitude <= 0) return 1;
+    const ratio = EARTH_RADIUS_M / (EARTH_RADIUS_M + altitude);
+    if (ratio >= 1 || ratio <= -1) return 1;
+    return EARTH_RADIUS_M * Math.acos(ratio);
+}, false);
+
+satEntity.ellipse = new Cesium.EllipseGraphics({
+    semiMinorAxis: footprintRadiusCallback,
+    semiMajorAxis: footprintRadiusCallback,
+    height: 0,
+    fill: true,
+    material: Cesium.Color.RED.withAlpha(0.15),
+    outline: true,
+    outlineColor: Cesium.Color.RED.withAlpha(0.8),
+    outlineWidth: 2,
+    show: false
 });
 
 function propagateToCartesian(satrec, time) {
@@ -184,12 +216,7 @@ function selectSatellite(index) {
     const entry = satelliteDatabase[index];
     if (!entry) return;
 
-    if (currentSatIndex >= 0 && satelliteDatabase[currentSatIndex]?.entity) {
-        satelliteDatabase[currentSatIndex].entity.show = true;
-    }
-    if (entry.entity) {
-        entry.entity.show = false;
-    }
+    satEntity.ellipse.show = true;
 
     currentSatIndex = index;
     currentSatrec = entry.satrec;
@@ -227,15 +254,38 @@ function populateSelector() {
         satelliteSelector.appendChild(opt);
     });
     satelliteSelector.disabled = false;
-
-    satelliteSelector.addEventListener('change', (e) => {
-        selectSatellite(parseInt(e.target.value, 10));
-    });
 }
 
-async function fetchSatelliteData() {
-    console.log('Scaricamento dati orbitali in corso...');
-    const response = await fetch(TLE_URL);
+function clearCurrentConstellation() {
+    for (const sat of satelliteDatabase) {
+        if (sat.entity) viewer.entities.remove(sat.entity);
+    }
+    satelliteDatabase = [];
+    currentSatrec = null;
+    currentSatName = '';
+    currentSatIndex = -1;
+    satEntity.label.text = '';
+    satEntity.ellipse.show = false;
+
+    for (let i = 0; i < NUM_SEGMENTS; i++) {
+        futureSegmentPositions[i] = [];
+        pastSegmentPositions[i] = [];
+    }
+
+    satelliteSelector.innerHTML = '';
+    satelliteSelector.disabled = true;
+
+    telLat.textContent = '--';
+    telLon.textContent = '--';
+    telAlt.textContent = '--';
+    telVel.textContent = '--';
+}
+
+async function fetchSatelliteData(url) {
+    clearCurrentConstellation();
+    console.log(`Scaricamento dati orbitali da ${url} ...`);
+
+    const response = await fetch(url);
     if (!response.ok) {
         throw new Error(`TLE fetch failed: HTTP ${response.status}`);
     }
@@ -287,7 +337,31 @@ async function fetchSatelliteData() {
         sat.entity = entity;
     });
 
-    return db;
+    satelliteDatabase = db;
+    populateSelector();
+    selectSatellite(0);
+    updateAllSatellitePositions();
+
+    console.log(`Caricati ${satelliteDatabase.length} satelliti`);
+}
+
+async function loadCategory(categoryKey) {
+    const url = CATEGORY_URLS[categoryKey];
+    if (!url) return;
+
+    categoryButtons.forEach(btn => {
+        btn.disabled = true;
+        btn.classList.toggle('active', btn.dataset.category === categoryKey);
+    });
+
+    try {
+        await fetchSatelliteData(url);
+    } catch (err) {
+        console.error('Errore nel download dei dati orbitali:', err);
+        satelliteSelector.innerHTML = '<option>Error loading data</option>';
+    } finally {
+        categoryButtons.forEach(btn => { btn.disabled = false; });
+    }
 }
 
 function setupClickHandler() {
@@ -301,25 +375,22 @@ function setupClickHandler() {
 }
 
 (async () => {
-    try {
-        satelliteDatabase = await fetchSatelliteData();
-        console.log(`Caricati ${satelliteDatabase.length} satelliti`);
+    createOrbitEntities();
+    setupClickHandler();
 
-        createOrbitEntities();
-        populateSelector();
-        setupClickHandler();
+    satelliteSelector.addEventListener('change', (e) => {
+        selectSatellite(parseInt(e.target.value, 10));
+    });
 
-        satelliteSelector.value = '0';
-        selectSatellite(0);
+    categoryButtons.forEach(btn => {
+        btn.addEventListener('click', () => loadCategory(btn.dataset.category));
+    });
+
+    await loadCategory(DEFAULT_CATEGORY);
+
+    setInterval(() => {
         updateAllSatellitePositions();
-
-        setInterval(() => {
-            updateAllSatellitePositions();
-            updateRealtimeSample();
-            updateOrbitLines();
-        }, 1000);
-    } catch (err) {
-        console.error('Errore nel download dei dati orbitali:', err);
-        satelliteSelector.innerHTML = '<option>Error loading data</option>';
-    }
+        updateRealtimeSample();
+        updateOrbitLines();
+    }, 1000);
 })();
