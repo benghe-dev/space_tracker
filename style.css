@@ -69,3 +69,32 @@ html, body {
     color: #6ea8c4;
     font-size: 11px;
 }
+
+#telemetry-panel .selector-row {
+    margin: 0 0 10px 0;
+    pointer-events: auto;
+}
+
+#telemetry-panel #satellite-selector {
+    width: 100%;
+    background: rgba(0, 20, 35, 0.85);
+    color: #d6f1ff;
+    border: 1px solid rgba(0, 220, 255, 0.4);
+    border-radius: 3px;
+    padding: 5px 6px;
+    font-family: 'Courier New', Consolas, 'Lucida Console', monospace;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    outline: none;
+    cursor: pointer;
+}
+
+#telemetry-panel #satellite-selector:focus {
+    border-color: #00e5ff;
+    box-shadow: 0 0 6px rgba(0, 220, 255, 0.5);
+}
+
+#telemetry-panel #satellite-selector option {
+    background: #06121c;
+    color: #d6f1ff;
+}

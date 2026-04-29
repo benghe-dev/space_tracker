@@ -11,7 +11,12 @@
 <body>
     <div id="cesiumContainer"></div>
     <div id="telemetry-panel">
-        <h2>ISS &middot; LIVE TELEMETRY</h2>
+        <h2>LIVE TELEMETRY</h2>
+        <div class="selector-row">
+            <select id="satellite-selector" disabled>
+                <option>Loading...</option>
+            </select>
+        </div>
         <div class="row"><span class="label">LAT</span><span id="tel-lat" class="value">--</span><span class="unit">&deg;</span></div>
         <div class="row"><span class="label">LON</span><span id="tel-lon" class="value">--</span><span class="unit">&deg;</span></div>
         <div class="row"><span class="label">ALT</span><span id="tel-alt" class="value">--</span><span class="unit">km</span></div>
