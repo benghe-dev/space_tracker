@@ -10,6 +10,13 @@
 </head>
 <body>
     <div id="cesiumContainer"></div>
+    <div id="telemetry-panel">
+        <h2>ISS &middot; LIVE TELEMETRY</h2>
+        <div class="row"><span class="label">LAT</span><span id="tel-lat" class="value">--</span><span class="unit">&deg;</span></div>
+        <div class="row"><span class="label">LON</span><span id="tel-lon" class="value">--</span><span class="unit">&deg;</span></div>
+        <div class="row"><span class="label">ALT</span><span id="tel-alt" class="value">--</span><span class="unit">km</span></div>
+        <div class="row"><span class="label">VEL</span><span id="tel-vel" class="value">--</span><span class="unit">km/h</span></div>
+    </div>
     <script src="app.js"></script>
 </body>
 </html>

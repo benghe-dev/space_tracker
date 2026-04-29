@@ -22,6 +22,11 @@ const TLE_URL = 'https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=
 
 let satrec = null;
 
+const telLat = document.getElementById('tel-lat');
+const telLon = document.getElementById('tel-lon');
+const telAlt = document.getElementById('tel-alt');
+const telVel = document.getElementById('tel-vel');
+
 const issEntity = viewer.entities.add({
     name: 'ISS',
     position: Cesium.Cartesian3.fromDegrees(10, 45, 400000),
@@ -47,7 +52,7 @@ function updateSatellitePosition() {
     const now = new Date();
     const positionAndVelocity = satellite.propagate(satrec, now);
 
-    if (!positionAndVelocity.position) {
+    if (!positionAndVelocity.position || !positionAndVelocity.velocity) {
         return;
     }
 
@@ -59,6 +64,19 @@ function updateSatellitePosition() {
         geodetic.latitude,
         geodetic.height * 1000
     );
+
+    const v = positionAndVelocity.velocity;
+    const speedKmS = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    const speedKmH = Math.round(speedKmS * 3600);
+
+    const latDeg = (geodetic.latitude * 180 / Math.PI).toFixed(4);
+    const lonDeg = (geodetic.longitude * 180 / Math.PI).toFixed(4);
+    const altKm = geodetic.height.toFixed(2);
+
+    telLat.textContent = latDeg;
+    telLon.textContent = lonDeg;
+    telAlt.textContent = altKm;
+    telVel.textContent = speedKmH.toLocaleString('en-US');
 }
 
 async function fetchISSTle() {
