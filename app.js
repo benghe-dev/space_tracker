@@ -19,6 +19,9 @@ const viewer = new Cesium.Viewer('cesiumContainer', {
 });
 
 viewer.clock.shouldAnimate = true;
+viewer.clock.multiplier = 1;
+viewer.scene.globe.enableLighting = true;
+viewer.scene.globe.dynamicAtmosphereLighting = true;
 
 const CATEGORY_URLS = {
     stations: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle',
@@ -46,8 +49,13 @@ const telLat = document.getElementById('tel-lat');
 const telLon = document.getElementById('tel-lon');
 const telAlt = document.getElementById('tel-alt');
 const telVel = document.getElementById('tel-vel');
+const telLos = document.getElementById('tel-los');
 const satelliteSelector = document.getElementById('satellite-selector');
 const categoryButtons = document.querySelectorAll('#category-panel .cat-btn');
+
+let groundStationGd = null;
+let groundStationCartesian = null;
+let groundStationEntity = null;
 
 const satEntity = viewer.entities.add({
     name: 'Satellite',
@@ -80,6 +88,22 @@ const footprintRadiusCallback = new Cesium.CallbackProperty((time) => {
     if (ratio >= 1 || ratio <= -1) return 1;
     return EARTH_RADIUS_M * Math.acos(ratio);
 }, false);
+
+const losLineEntity = viewer.entities.add({
+    name: 'LOS',
+    polyline: {
+        positions: new Cesium.CallbackProperty((time) => {
+            if (!groundStationCartesian || !satEntity.position) return [];
+            const satPos = satEntity.position.getValue(time);
+            if (!satPos) return [];
+            return [groundStationCartesian, satPos];
+        }, false),
+        width: 2,
+        material: Cesium.Color.LIME.withAlpha(0.85),
+        arcType: Cesium.ArcType.NONE,
+        show: false
+    }
+});
 
 satEntity.ellipse = new Cesium.EllipseGraphics({
     semiMinorAxis: footprintRadiusCallback,
@@ -186,6 +210,29 @@ function updateAllSatellitePositions() {
     }
 }
 
+function updateLOS(positionEci, gmst) {
+    if (!groundStationGd) return;
+    try {
+        const positionEcf = satellite.eciToEcf(positionEci, gmst);
+        const lookAngles = satellite.ecfToLookAngles(groundStationGd, positionEcf);
+        const elevationDeg = lookAngles.elevation * 180 / Math.PI;
+
+        if (lookAngles.elevation > 0) {
+            losLineEntity.polyline.show = true;
+            telLos.textContent = `ACQUIRED ${elevationDeg.toFixed(1)}°`;
+            telLos.className = 'value los-acquired';
+        } else {
+            losLineEntity.polyline.show = false;
+            telLos.textContent = 'BLOCKED';
+            telLos.className = 'value los-blocked';
+        }
+    } catch (err) {
+        losLineEntity.polyline.show = false;
+        telLos.textContent = 'ERROR';
+        telLos.className = 'value los-blocked';
+    }
+}
+
 function updateRealtimeSample() {
     if (!currentSatrec) return;
 
@@ -210,6 +257,57 @@ function updateRealtimeSample() {
     telLon.textContent = (geodetic.longitude * 180 / Math.PI).toFixed(4);
     telAlt.textContent = geodetic.height.toFixed(2);
     telVel.textContent = speedKmH.toLocaleString('en-US');
+
+    updateLOS(positionAndVelocity.position, gmst);
+}
+
+function requestUserLocation() {
+    if (!navigator.geolocation) {
+        telLos.textContent = 'N/A';
+        telLos.className = 'value los-na';
+        return;
+    }
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            const altKm = (pos.coords.altitude || 0) / 1000;
+
+            groundStationGd = {
+                longitude: lon * Math.PI / 180,
+                latitude: lat * Math.PI / 180,
+                height: altKm
+            };
+            groundStationCartesian = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
+
+            groundStationEntity = viewer.entities.add({
+                name: 'Ground Station',
+                position: groundStationCartesian,
+                point: {
+                    pixelSize: 9,
+                    color: Cesium.Color.DODGERBLUE,
+                    outlineColor: Cesium.Color.WHITE,
+                    outlineWidth: 2
+                },
+                label: {
+                    text: 'Ground Station',
+                    font: '12px sans-serif',
+                    pixelOffset: new Cesium.Cartesian2(0, -18),
+                    fillColor: Cesium.Color.WHITE,
+                    showBackground: true,
+                    backgroundColor: new Cesium.Color(0, 0, 0, 0.6)
+                }
+            });
+
+            console.log(`Ground station: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+        },
+        (err) => {
+            console.warn('Geolocation denied/unavailable:', err.message);
+            telLos.textContent = 'N/A';
+            telLos.className = 'value los-na';
+        },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }
+    );
 }
 
 function selectSatellite(index) {
@@ -377,6 +475,7 @@ function setupClickHandler() {
 (async () => {
     createOrbitEntities();
     setupClickHandler();
+    requestUserLocation();
 
     satelliteSelector.addEventListener('change', (e) => {
         selectSatellite(parseInt(e.target.value, 10));

@@ -99,6 +99,27 @@ html, body {
     color: #d6f1ff;
 }
 
+#telemetry-panel .los-row {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(0, 220, 255, 0.2);
+}
+
+#telemetry-panel .value.los-acquired {
+    color: #00ff7e;
+    text-shadow: 0 0 6px rgba(0, 255, 120, 0.6);
+}
+
+#telemetry-panel .value.los-blocked {
+    color: #ff5555;
+    text-shadow: 0 0 6px rgba(255, 80, 80, 0.5);
+}
+
+#telemetry-panel .value.los-na {
+    color: #888;
+    text-shadow: none;
+}
+
 #category-panel {
     position: absolute;
     top: 20px;
