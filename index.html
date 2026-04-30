@@ -6,7 +6,7 @@
     <link href="https://cesium.com/downloads/cesiumjs/releases/1.118/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.118/Build/Cesium/Cesium.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/5.0.0/satellite.min.js"></script>
     <link rel="stylesheet" href="style.css">
@@ -14,68 +14,87 @@
 <body>
     <div id="cesiumContainer"></div>
 
-    <div id="telemetry-panel" class="glass-panel">
-        <div class="hud-header">
-            <span class="status-dot"></span>
-            <span class="hud-title">Live Telemetry</span>
-            <span class="hud-tag">SGP4</span>
-        </div>
+    <div id="mission-control-panel" class="glass-panel">
 
-        <div class="metric-grid">
-            <div class="metric">
-                <div class="metric-label">Latitude</div>
-                <div class="metric-row">
-                    <span id="tel-lat" class="metric-value">--</span>
-                    <span class="metric-unit">&deg;</span>
+        <div class="mc-section mc-telemetry">
+            <div class="hud-header">
+                <span class="status-dot"></span>
+                <span class="hud-title">Live Telemetry</span>
+                <span class="hud-tag">SGP4</span>
+            </div>
+
+            <div class="metric-grid">
+                <div class="metric">
+                    <div class="metric-label">Latitude</div>
+                    <div class="metric-row">
+                        <span id="tel-lat" class="metric-value">--</span>
+                        <span class="metric-unit">&deg;</span>
+                    </div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Longitude</div>
+                    <div class="metric-row">
+                        <span id="tel-lon" class="metric-value">--</span>
+                        <span class="metric-unit">&deg;</span>
+                    </div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Altitude</div>
+                    <div class="metric-row">
+                        <span id="tel-alt" class="metric-value">--</span>
+                        <span class="metric-unit">km</span>
+                    </div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Velocity</div>
+                    <div class="metric-row">
+                        <span id="tel-vel" class="metric-value">--</span>
+                        <span class="metric-unit">km/h</span>
+                    </div>
                 </div>
             </div>
-            <div class="metric">
-                <div class="metric-label">Longitude</div>
-                <div class="metric-row">
-                    <span id="tel-lon" class="metric-value">--</span>
-                    <span class="metric-unit">&deg;</span>
+
+            <div class="los-card">
+                <div class="los-heading">Line of Sight</div>
+                <div id="tel-los" class="value los-na">--</div>
+            </div>
+
+            <button id="camera-lock-btn" class="action-btn" type="button">LOCK CAMERA</button>
+        </div>
+
+        <div class="mc-divider"></div>
+
+        <div class="mc-section mc-controls">
+            <div class="ctrl-section">
+                <span class="ctrl-label">Constellation</span>
+                <div id="category-panel" class="ctrl-buttons">
+                    <button class="cat-btn" data-category="stations">Stations</button>
+                    <button class="cat-btn" data-category="visual">Brightest</button>
+                    <button class="cat-btn" data-category="gps">GPS</button>
                 </div>
             </div>
-            <div class="metric">
-                <div class="metric-label">Altitude</div>
-                <div class="metric-row">
-                    <span id="tel-alt" class="metric-value">--</span>
-                    <span class="metric-unit">km</span>
+
+            <div class="ctrl-section">
+                <span class="ctrl-label">Search</span>
+                <input id="sat-search" type="text" placeholder="Search satellite..." autocomplete="off" spellcheck="false" />
+            </div>
+
+            <div class="ctrl-section">
+                <span class="ctrl-label">Active Satellite</span>
+                <select id="satellite-selector" disabled>
+                    <option>Loading...</option>
+                </select>
+            </div>
+
+            <div class="ctrl-section">
+                <span class="ctrl-label">Orbit Preview</span>
+                <div class="slider-row">
+                    <input type="range" id="orbit-slider" min="1" max="10" value="1" step="1">
+                    <span id="orbit-slider-value">1 Orbit</span>
                 </div>
             </div>
-            <div class="metric">
-                <div class="metric-label">Velocity</div>
-                <div class="metric-row">
-                    <span id="tel-vel" class="metric-value">--</span>
-                    <span class="metric-unit">km/h</span>
-                </div>
-            </div>
         </div>
 
-        <div class="los-card">
-            <div class="los-heading">Line of Sight</div>
-            <div id="tel-los" class="value los-na">--</div>
-        </div>
-    </div>
-
-    <div id="control-panel" class="glass-panel">
-        <div class="ctrl-section">
-            <span class="ctrl-label">Constellation</span>
-            <div id="category-panel" class="ctrl-buttons">
-                <button class="cat-btn" data-category="stations">Space Stations</button>
-                <button class="cat-btn" data-category="visual">100 Brightest</button>
-                <button class="cat-btn" data-category="gps">GPS / Navstar</button>
-            </div>
-        </div>
-
-        <div class="ctrl-divider"></div>
-
-        <div class="ctrl-section ctrl-section-select">
-            <span class="ctrl-label">Active Satellite</span>
-            <select id="satellite-selector" disabled>
-                <option>Loading...</option>
-            </select>
-        </div>
     </div>
 
     <script src="app.js"></script>

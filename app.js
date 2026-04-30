@@ -29,11 +29,11 @@ const CATEGORY_URLS = {
     gps: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=gps-ops&FORMAT=tle'
 };
 const DEFAULT_CATEGORY = 'stations';
-const ORBIT_WINDOW_MIN = 186;
 const EARTH_RADIUS_M = 6371000;
 const NUM_SEGMENTS = 12;
-const MIN_PER_SEGMENT = ORBIT_WINDOW_MIN / NUM_SEGMENTS;
 const MIN_ALPHA = 0.05;
+
+let orbitsToPreview = 1;
 
 let satelliteDatabase = [];
 let currentSatrec = null;
@@ -52,10 +52,16 @@ const telVel = document.getElementById('tel-vel');
 const telLos = document.getElementById('tel-los');
 const satelliteSelector = document.getElementById('satellite-selector');
 const categoryButtons = document.querySelectorAll('#category-panel .cat-btn');
+const satSearchInput = document.getElementById('sat-search');
+const cameraLockBtn = document.getElementById('camera-lock-btn');
+const orbitSlider = document.getElementById('orbit-slider');
+const orbitSliderValue = document.getElementById('orbit-slider-value');
 
 let groundStationGd = null;
 let groundStationCartesian = null;
 let groundStationEntity = null;
+let isCameraLocked = false;
+let currentSearchQuery = '';
 
 const satEntity = viewer.entities.add({
     name: 'Satellite',
@@ -129,16 +135,17 @@ function propagateToCartesian(satrec, time) {
     );
 }
 
-function buildSegmentPositions(satrec, direction, segIdx, nowMs) {
-    const startMin = direction * segIdx * MIN_PER_SEGMENT;
-    const endMin = direction * (segIdx + 1) * MIN_PER_SEGMENT;
+function buildSegmentPositions(satrec, direction, segIdx, nowMs, minPerSegment, stepMin) {
+    const startMin = direction * segIdx * minPerSegment;
+    const endMin = direction * (segIdx + 1) * minPerSegment;
     const positions = [];
+    const step = direction * stepMin;
 
     let t = startMin;
     while ((direction > 0 && t < endMin) || (direction < 0 && t > endMin)) {
         const pos = propagateToCartesian(satrec, new Date(nowMs + t * 60000));
         if (pos) positions.push(pos);
-        t += direction;
+        t += step;
     }
     const endPos = propagateToCartesian(satrec, new Date(nowMs + endMin * 60000));
     if (endPos) positions.push(endPos);
@@ -181,9 +188,17 @@ function createOrbitEntities() {
 function updateOrbitLines() {
     if (!currentSatrec) return;
     const nowMs = Date.now();
+
+    const periodMinutes = (2 * Math.PI) / currentSatrec.no;
+    if (!Number.isFinite(periodMinutes) || periodMinutes <= 0) return;
+
+    const totalMinutes = periodMinutes * orbitsToPreview;
+    const stepSize = Math.max(1, Math.min(Math.round(totalMinutes / 1000), 4));
+    const minPerSegment = totalMinutes / NUM_SEGMENTS;
+
     for (let i = 0; i < NUM_SEGMENTS; i++) {
-        futureSegmentPositions[i] = buildSegmentPositions(currentSatrec, 1, i, nowMs);
-        pastSegmentPositions[i] = buildSegmentPositions(currentSatrec, -1, i, nowMs);
+        futureSegmentPositions[i] = buildSegmentPositions(currentSatrec, 1, i, nowMs, minPerSegment, stepSize);
+        pastSegmentPositions[i] = buildSegmentPositions(currentSatrec, -1, i, nowMs, minPerSegment, stepSize);
     }
 }
 
@@ -322,11 +337,17 @@ function selectSatellite(index) {
     satEntity.label.text = entry.name;
 
     if (satelliteSelector.value !== String(index)) {
-        satelliteSelector.value = String(index);
+        const opt = satelliteSelector.querySelector(`option[value="${index}"]`);
+        if (opt) satelliteSelector.value = String(index);
     }
 
     updateRealtimeSample();
     updateOrbitLines();
+
+    if (isCameraLocked && entry.entity) {
+        viewer.trackedEntity = entry.entity;
+        return;
+    }
 
     const now = new Date();
     const pv = satellite.propagate(currentSatrec, now);
@@ -343,15 +364,35 @@ function selectSatellite(index) {
     }
 }
 
-function populateSelector() {
+function populateSelector(filterQuery = currentSearchQuery) {
+    const q = (filterQuery || '').trim().toLowerCase();
     satelliteSelector.innerHTML = '';
+
+    let matchCount = 0;
     satelliteDatabase.forEach((sat, idx) => {
+        if (q && !sat.name.toLowerCase().includes(q)) return;
         const opt = document.createElement('option');
         opt.value = String(idx);
         opt.textContent = sat.name;
         satelliteSelector.appendChild(opt);
+        matchCount++;
     });
+
+    if (matchCount === 0) {
+        const opt = document.createElement('option');
+        opt.textContent = q ? 'No matches' : 'No satellites';
+        opt.disabled = true;
+        satelliteSelector.appendChild(opt);
+        satelliteSelector.disabled = true;
+        return;
+    }
+
     satelliteSelector.disabled = false;
+
+    if (currentSatIndex >= 0) {
+        const matching = satelliteSelector.querySelector(`option[value="${currentSatIndex}"]`);
+        if (matching) satelliteSelector.value = String(currentSatIndex);
+    }
 }
 
 function clearCurrentConstellation() {
@@ -364,6 +405,13 @@ function clearCurrentConstellation() {
     currentSatIndex = -1;
     satEntity.label.text = '';
     satEntity.ellipse.show = false;
+
+    if (isCameraLocked) {
+        viewer.trackedEntity = undefined;
+        isCameraLocked = false;
+        cameraLockBtn.textContent = 'LOCK CAMERA';
+        cameraLockBtn.classList.remove('locked');
+    }
 
     for (let i = 0; i < NUM_SEGMENTS; i++) {
         futureSegmentPositions[i] = [];
@@ -478,11 +526,41 @@ function setupClickHandler() {
     requestUserLocation();
 
     satelliteSelector.addEventListener('change', (e) => {
-        selectSatellite(parseInt(e.target.value, 10));
+        const idx = parseInt(e.target.value, 10);
+        if (Number.isFinite(idx)) selectSatellite(idx);
     });
 
     categoryButtons.forEach(btn => {
         btn.addEventListener('click', () => loadCategory(btn.dataset.category));
+    });
+
+    satSearchInput.addEventListener('input', (e) => {
+        currentSearchQuery = e.target.value;
+        populateSelector();
+    });
+
+    orbitSlider.addEventListener('input', () => {
+        orbitsToPreview = parseInt(orbitSlider.value, 10) || 1;
+        orbitSliderValue.textContent = orbitsToPreview === 1
+            ? '1 Orbit'
+            : `${orbitsToPreview} Orbits`;
+        updateOrbitLines();
+    });
+
+    cameraLockBtn.addEventListener('click', () => {
+        if (!isCameraLocked) {
+            const entry = satelliteDatabase[currentSatIndex];
+            if (!entry || !entry.entity) return;
+            viewer.trackedEntity = entry.entity;
+            isCameraLocked = true;
+            cameraLockBtn.textContent = 'UNLOCK CAMERA';
+            cameraLockBtn.classList.add('locked');
+        } else {
+            viewer.trackedEntity = undefined;
+            isCameraLocked = false;
+            cameraLockBtn.textContent = 'LOCK CAMERA';
+            cameraLockBtn.classList.remove('locked');
+        }
     });
 
     await loadCategory(DEFAULT_CATEGORY);
