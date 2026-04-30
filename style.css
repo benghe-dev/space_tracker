@@ -295,6 +295,7 @@ button:focus, input:focus, select:focus {
 .ctrl-buttons {
     display: flex;
     gap: 6px;
+    flex-wrap: wrap;
 }
 
 #category-panel {
@@ -348,6 +349,28 @@ button:focus, input:focus, select:focus {
     cursor: wait;
     transform: none;
     box-shadow: none;
+}
+
+.cat-btn-aviation {
+    flex-basis: 100%;
+    color: #ffb84d;
+    border-color: rgba(255, 157, 0, 0.25);
+}
+
+.cat-btn-aviation:hover:not(:disabled) {
+    border-color: #ff9d00;
+    color: #ffb84d;
+    background: rgba(255, 157, 0, 0.10);
+    box-shadow: 0 0 12px rgba(255, 157, 0, 0.5),
+                inset 0 0 6px rgba(255, 157, 0, 0.12);
+}
+
+.cat-btn-aviation.active {
+    background: rgba(255, 157, 0, 0.18);
+    border-color: #ff9d00;
+    color: #ffb84d;
+    box-shadow: 0 0 12px rgba(255, 157, 0, 0.5),
+                inset 0 0 6px rgba(255, 157, 0, 0.18);
 }
 
 /* ============= INPUT (Search) ============= */
