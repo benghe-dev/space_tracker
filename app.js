@@ -251,7 +251,10 @@ function updateLOS(positionEci, gmst) {
 }
 
 function updateRealtimeSample() {
-    if (!currentSatrec) return;
+    if (!currentSatrec) {
+        footprintEntity.show = false;
+        return;
+    }
 
     const now = new Date();
     const positionAndVelocity = satellite.propagate(currentSatrec, now);
@@ -260,11 +263,14 @@ function updateRealtimeSample() {
     const gmst = satellite.gstime(now);
     const geodetic = satellite.eciToGeodetic(positionAndVelocity.position, gmst);
 
-    satEntity.position = Cesium.Cartesian3.fromRadians(
+    const cartesianPosition = Cesium.Cartesian3.fromRadians(
         geodetic.longitude,
         geodetic.latitude,
         geodetic.height * 1000
     );
+
+    satEntity.position = cartesianPosition;
+    footprintEntity.position = cartesianPosition;
 
     const v = positionAndVelocity.velocity;
     const speedKmS = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
@@ -331,10 +337,6 @@ function selectSatellite(index) {
     const entry = satelliteDatabase[index];
     if (!entry) return;
 
-    if (currentSatIndex >= 0 && satelliteDatabase[currentSatIndex]?.entity) {
-        satelliteDatabase[currentSatIndex].entity.ellipse = undefined;
-    }
-
     currentSatIndex = index;
     currentSatrec = entry.satrec;
     currentSatName = entry.name;
@@ -345,9 +347,7 @@ function selectSatellite(index) {
         if (opt) satelliteSelector.value = String(index);
     }
 
-    if (entry.entity) {
-        attachFootprint(entry.entity);
-    }
+    footprintEntity.show = true;
 
     updateRealtimeSample();
     updateOrbitLines();
@@ -412,6 +412,7 @@ function clearCurrentConstellation() {
     currentSatName = '';
     currentSatIndex = -1;
     satEntity.label.text = '';
+    footprintEntity.show = false;
 
     if (isCameraLocked) {
         viewer.trackedEntity = undefined;
