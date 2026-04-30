@@ -1,11 +1,7 @@
-Cesium.Ion.defaultAccessToken = '';
+Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJmYzY2MDg0Yi1mMzM4LTRkMTAtYWQ1NS1hMGE4NDU3NmZmM2EiLCJpZCI6NDI1NzYyLCJpYXQiOjE3Nzc1NTI5MDF9.tHqMv5WVu4mVZQhPYdJdq-_9kFCCDjW0R915wwYgOQ0';
 
 const viewer = new Cesium.Viewer('cesiumContainer', {
-    baseLayer: Cesium.ImageryLayer.fromProviderAsync(
-        Promise.resolve(new Cesium.OpenStreetMapImageryProvider({
-            url: 'https://a.tile.openstreetmap.org/'
-        }))
-    ),
+    terrain: Cesium.Terrain.fromWorldTerrain(),
     baseLayerPicker: false,
     geocoder: false,
     timeline: false,
@@ -14,14 +10,17 @@ const viewer = new Cesium.Viewer('cesiumContainer', {
     homeButton: false,
     sceneModePicker: false,
     navigationHelpButton: false,
-    fullscreenButton: false,
-    terrainProvider: new Cesium.EllipsoidTerrainProvider()
+    fullscreenButton: false
 });
 
 viewer.clock.shouldAnimate = true;
 viewer.clock.multiplier = 1;
 viewer.scene.globe.enableLighting = true;
 viewer.scene.globe.dynamicAtmosphereLighting = true;
+viewer.scene.globe.depthTestAgainstTerrain = true;
+
+viewer.scene.screenSpaceCameraController.maximumZoomDistance = 50000000;
+viewer.scene.screenSpaceCameraController.minimumZoomDistance = 100;
 
 const CATEGORY_URLS = {
     stations: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle',
@@ -82,19 +81,6 @@ const satEntity = viewer.entities.add({
     }
 });
 
-const footprintRadiusCallback = new Cesium.CallbackProperty((time) => {
-    if (!satEntity || !satEntity.position) return 1;
-    const pos = satEntity.position.getValue(time);
-    if (!pos) return 1;
-    const cartographic = Cesium.Cartographic.fromCartesian(pos);
-    if (!cartographic) return 1;
-    const altitude = cartographic.height;
-    if (!Number.isFinite(altitude) || altitude <= 0) return 1;
-    const ratio = EARTH_RADIUS_M / (EARTH_RADIUS_M + altitude);
-    if (ratio >= 1 || ratio <= -1) return 1;
-    return EARTH_RADIUS_M * Math.acos(ratio);
-}, false);
-
 const losLineEntity = viewer.entities.add({
     name: 'LOS',
     polyline: {
@@ -111,16 +97,32 @@ const losLineEntity = viewer.entities.add({
     }
 });
 
-satEntity.ellipse = new Cesium.EllipseGraphics({
-    semiMinorAxis: footprintRadiusCallback,
-    semiMajorAxis: footprintRadiusCallback,
-    height: 0,
-    fill: true,
-    material: Cesium.Color.RED.withAlpha(0.15),
-    outline: true,
-    outlineColor: Cesium.Color.RED.withAlpha(0.8),
-    outlineWidth: 2,
-    show: false
+function computeFootprintRadius(time) {
+    if (!footprintEntity || !footprintEntity.position) return 1;
+    const pos = footprintEntity.position.getValue(time);
+    if (!pos) return 1;
+    const cartographic = Cesium.Cartographic.fromCartesian(pos);
+    if (!cartographic) return 1;
+    const altitude = cartographic.height;
+    if (!Number.isFinite(altitude) || altitude <= 0) return 1;
+    const ratio = EARTH_RADIUS_M / (EARTH_RADIUS_M + altitude);
+    if (ratio >= 1 || ratio <= -1) return 1;
+    return EARTH_RADIUS_M * Math.acos(ratio);
+}
+
+const footprintEntity = viewer.entities.add({
+    id: 'global-footprint',
+    position: undefined,
+    show: false,
+    ellipse: {
+        semiMajorAxis: new Cesium.CallbackProperty(computeFootprintRadius, false),
+        semiMinorAxis: new Cesium.CallbackProperty(computeFootprintRadius, false),
+        material: Cesium.Color.CYAN.withAlpha(0.15),
+        outline: true,
+        outlineColor: Cesium.Color.CYAN,
+        height: 100000,
+        granularity: Cesium.Math.RADIANS_PER_DEGREE / 2
+    }
 });
 
 function propagateToCartesian(satrec, time) {
@@ -329,7 +331,9 @@ function selectSatellite(index) {
     const entry = satelliteDatabase[index];
     if (!entry) return;
 
-    satEntity.ellipse.show = true;
+    if (currentSatIndex >= 0 && satelliteDatabase[currentSatIndex]?.entity) {
+        satelliteDatabase[currentSatIndex].entity.ellipse = undefined;
+    }
 
     currentSatIndex = index;
     currentSatrec = entry.satrec;
@@ -339,6 +343,10 @@ function selectSatellite(index) {
     if (satelliteSelector.value !== String(index)) {
         const opt = satelliteSelector.querySelector(`option[value="${index}"]`);
         if (opt) satelliteSelector.value = String(index);
+    }
+
+    if (entry.entity) {
+        attachFootprint(entry.entity);
     }
 
     updateRealtimeSample();
@@ -404,7 +412,6 @@ function clearCurrentConstellation() {
     currentSatName = '';
     currentSatIndex = -1;
     satEntity.label.text = '';
-    satEntity.ellipse.show = false;
 
     if (isCameraLocked) {
         viewer.trackedEntity = undefined;
