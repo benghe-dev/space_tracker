@@ -27,8 +27,8 @@ const CATEGORY_URLS = {
     visual: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=tle',
     gps: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=gps-ops&FORMAT=tle'
 };
-const AVIATION_URL = 'https://aerospace-tracker.benghe-web.workers.dev';
-const AVIATION_REFRESH_MS = 15000;
+const AVIATION_URL = '/api/flights'; // '/api/flights' deployed, 'https://api.adsb.lol/v2/lat/47/lon/10/dist/2500' local
+const AVIATION_REFRESH_MS = 100;
 const DEFAULT_CATEGORY = 'stations';
 
 let currentDomain = 'SPACE';
@@ -538,22 +538,6 @@ async function fetchSatelliteData(url) {
     console.log(`Caricati ${satelliteDatabase.length} satelliti`);
 }
 
-function parseAviationState(state) {
-    if (!state) return null;
-    const longitude = state[5];
-    const latitude = state[6];
-    if (longitude == null || latitude == null) return null;
-    return {
-        icao24: state[0],
-        callsign: state[1] ? state[1].trim() : 'UNKNOWN',
-        longitude,
-        latitude,
-        altitude: state[13] || state[7] || 0,
-        velocity: state[9] || 0,
-        heading: state[10] || 0
-    };
-}
-
 function createAviationEntity(plane) {
     return viewer.entities.add({
         position: Cesium.Cartesian3.fromDegrees(plane.longitude, plane.latitude, plane.altitude),
@@ -583,122 +567,85 @@ function updateAviationHUD(metadata) {
     telLos.className = 'value los-na';
 }
 
-async function fetchAviationStates() {
-    const response = await fetch(AVIATION_URL);
-    if (!response.ok) {
-        throw new Error(`OpenSky API Error: ${response.status} ${response.statusText}`);
-    }
-    const data = await response.json();
-    if (!Array.isArray(data.states)) return [];
-    return data.states.map(parseAviationState).filter(Boolean);
-}
-
 async function fetchAviationData() {
-    clearCurrentConstellation();
-    currentDomain = 'AVIATION';
-    satEntity.point.show = false;
-    satEntity.label.text = '';
-    losLineEntity.polyline.show = false;
-    footprintEntity.show = false;
-
-    console.log('Scaricamento radar aviazione (OpenSky) ...');
-    let planes;
-    try {
-        planes = await fetchAviationStates();
-    } catch (err) {
-        console.error('Aviation fetch failed:', err.message);
-        satelliteSelector.innerHTML = '<option>Aviation feed unavailable</option>';
-        satelliteSelector.disabled = true;
-        return;
-    }
-
-    if (planes.length === 0) {
-        console.warn('OpenSky returned no aircraft in current bounding box');
-        satelliteSelector.innerHTML = '<option>No aircraft in feed</option>';
-        satelliteSelector.disabled = true;
-        return;
-    }
-
-    const db = planes.map((plane) => ({
-        name: plane.callsign,
-        isAircraft: true,
-        icao24: plane.icao24,
-        metadata: plane,
-        entity: createAviationEntity(plane)
-    }));
-    db.forEach((sat, idx) => { sat.entity.satIndex = idx; });
-
-    satelliteDatabase = db;
-    populateSelector();
-    selectSatellite(0);
-
-    aviationUpdateInterval = setInterval(refreshAviationData, AVIATION_REFRESH_MS);
-    console.log(`Caricati ${satelliteDatabase.length} aerei`);
-}
-
-async function refreshAviationData() {
     if (currentDomain !== 'AVIATION') return;
-    let planes;
     try {
-        planes = await fetchAviationStates();
+        const response = await fetch(AVIATION_URL);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const data = await response.json();
+        if (!Array.isArray(data.ac)) {
+            console.warn('Aviation feed missing data.ac array');
+            return;
+        }
+
+        if (currentDomain !== 'AVIATION') return;
+
+        const planes = data.ac.map((plane) => {
+            if (plane.lat == null || plane.lon == null) return null;
+            return {
+                icao24: String(plane.hex || `${plane.lat}-${plane.lon}`),
+                callsign: plane.flight ? plane.flight.trim() : 'UNKNOWN',
+                longitude: plane.lon,
+                latitude: plane.lat,
+                altitude: (Number(plane.alt_baro) || 0) * 0.3048,
+                velocity: Number(plane.gs) || 0,
+                heading: Number(plane.track) || 0
+            };
+        }).filter(Boolean);
+
+        const wasEmpty = !satelliteDatabase.some((s) => s.isAircraft);
+        const oldByIcao = new Map();
+        satelliteDatabase.forEach((sat) => {
+            if (sat.isAircraft) oldByIcao.set(sat.icao24, sat);
+        });
+        const newIcaos = new Set(planes.map((p) => p.icao24));
+        const oldSelectedIcao = currentSatIndex >= 0 ? satelliteDatabase[currentSatIndex]?.icao24 : null;
+
+        const updatedDb = [];
+        for (const plane of planes) {
+            const existing = oldByIcao.get(plane.icao24);
+            if (existing) {
+                existing.metadata = plane;
+                existing.name = plane.callsign;
+                existing.entity.position = Cesium.Cartesian3.fromDegrees(plane.longitude, plane.latitude, plane.altitude);
+                if (existing.entity.label) existing.entity.label.text = plane.callsign;
+                updatedDb.push(existing);
+            } else {
+                updatedDb.push({
+                    name: plane.callsign,
+                    isAircraft: true,
+                    icao24: plane.icao24,
+                    metadata: plane,
+                    entity: createAviationEntity(plane)
+                });
+            }
+        }
+
+        for (const sat of satelliteDatabase) {
+            if (sat.isAircraft && !newIcaos.has(sat.icao24)) {
+                viewer.entities.remove(sat.entity);
+            }
+        }
+
+        updatedDb.forEach((sat, idx) => { sat.entity.satIndex = idx; });
+        satelliteDatabase = updatedDb;
+        populateSelector();
+
+        if (oldSelectedIcao) {
+            const newIndex = updatedDb.findIndex((s) => s.icao24 === oldSelectedIcao);
+            if (newIndex >= 0) {
+                currentSatIndex = newIndex;
+                satelliteSelector.value = String(newIndex);
+                currentSatName = updatedDb[newIndex].name;
+                satEntity.label.text = currentSatName;
+                updateAviationHUD(updatedDb[newIndex].metadata);
+            }
+        } else if (wasEmpty && updatedDb.length > 0) {
+            selectSatellite(0);
+        }
     } catch (err) {
-        console.warn('Aviation refresh failed:', err);
-        return;
-    }
-    if (currentDomain !== 'AVIATION') return;
-
-    const oldByIcao = new Map();
-    satelliteDatabase.forEach(sat => {
-        if (sat.isAircraft) oldByIcao.set(sat.icao24, sat);
-    });
-    const newIcaos = new Set(planes.map(p => p.icao24));
-    const oldSelectedIcao = currentSatIndex >= 0 ? satelliteDatabase[currentSatIndex]?.icao24 : null;
-
-    const updatedDb = [];
-    for (const plane of planes) {
-        const existing = oldByIcao.get(plane.icao24);
-        if (existing) {
-            existing.metadata = plane;
-            existing.name = plane.callsign;
-            existing.entity.position = Cesium.Cartesian3.fromDegrees(plane.longitude, plane.latitude, plane.altitude);
-            if (existing.entity.label) existing.entity.label.text = plane.callsign;
-            updatedDb.push(existing);
-        } else {
-            updatedDb.push({
-                name: plane.callsign,
-                isAircraft: true,
-                icao24: plane.icao24,
-                metadata: plane,
-                entity: createAviationEntity(plane)
-            });
-        }
-    }
-
-    for (const sat of satelliteDatabase) {
-        if (sat.isAircraft && !newIcaos.has(sat.icao24)) {
-            viewer.entities.remove(sat.entity);
-        }
-    }
-
-    updatedDb.forEach((sat, idx) => { sat.entity.satIndex = idx; });
-    satelliteDatabase = updatedDb;
-
-    const newIndex = oldSelectedIcao ? updatedDb.findIndex(s => s.icao24 === oldSelectedIcao) : -1;
-    currentSatIndex = newIndex;
-    populateSelector();
-
-    if (newIndex >= 0) {
-        satelliteSelector.value = String(newIndex);
-        currentSatName = updatedDb[newIndex].name;
-        satEntity.label.text = currentSatName;
-        updateAviationHUD(updatedDb[newIndex].metadata);
-    } else {
-        currentSatName = '';
-        satEntity.label.text = '';
-        telLat.textContent = '--';
-        telLon.textContent = '--';
-        telAlt.textContent = '--';
-        telVel.textContent = '--';
+        console.warn('Aviation fetch failed:', err);
     }
 }
 
@@ -710,7 +657,14 @@ async function loadCategory(categoryKey) {
 
     try {
         if (categoryKey === 'aviation') {
+            clearCurrentConstellation();
+            currentDomain = 'AVIATION';
+            satEntity.point.show = false;
+            satEntity.label.text = '';
+            losLineEntity.polyline.show = false;
+            footprintEntity.show = false;
             await fetchAviationData();
+            aviationUpdateInterval = setInterval(fetchAviationData, AVIATION_REFRESH_MS);
         } else {
             const url = CATEGORY_URLS[categoryKey];
             if (!url) return;
