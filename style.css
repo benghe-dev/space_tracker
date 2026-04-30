@@ -1,9 +1,35 @@
+:root {
+    --bg-deep: #050811;
+    --panel-bg: rgba(10, 15, 30, 0.7);
+    --panel-border: rgba(0, 255, 255, 0.18);
+    --panel-border-strong: rgba(0, 229, 255, 0.45);
+    --text-bright: #e8f6ff;
+    --text-dim: #6a8bab;
+    --text-label: #5e7c9a;
+    --accent-cyan: #00e5ff;
+    --accent-cyan-soft: rgba(0, 229, 255, 0.4);
+    --accent-green: #00ff9d;
+    --accent-red: #ff4564;
+    --shadow-strong: 0 8px 32px rgba(0, 0, 0, 0.45);
+    --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --transition-default: all 0.3s ease;
+}
+
+* {
+    box-sizing: border-box;
+}
+
 html, body {
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
+    background: var(--bg-deep);
+    color: var(--text-bright);
+    font-family: 'Rajdhani', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 #cesiumContainer {
@@ -11,176 +37,332 @@ html, body {
     height: 100vh;
 }
 
-#telemetry-panel {
+/* ============= Glass Panel base ============= */
+.glass-panel {
     position: absolute;
-    top: 20px;
-    left: 20px;
     z-index: 1000;
-    min-width: 240px;
-    padding: 14px 18px;
-    background: rgba(8, 14, 22, 0.78);
-    border: 1px solid rgba(0, 220, 255, 0.45);
-    border-radius: 4px;
-    box-shadow: 0 0 18px rgba(0, 180, 255, 0.18), inset 0 0 12px rgba(0, 100, 160, 0.15);
-    color: #d6f1ff;
-    font-family: 'Courier New', Consolas, 'Lucida Console', monospace;
-    font-size: 13px;
-    letter-spacing: 0.5px;
-    backdrop-filter: blur(2px);
-    pointer-events: none;
+    background: var(--panel-bg);
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-strong), var(--shadow-inset);
+    color: var(--text-bright);
+}
+
+/* ============= TELEMETRY HUD ============= */
+#telemetry-panel {
+    top: 24px;
+    left: 24px;
+    width: 340px;
+    padding: 18px 22px 20px;
     user-select: none;
 }
 
-#telemetry-panel h2 {
-    margin: 0 0 10px 0;
-    padding-bottom: 6px;
-    border-bottom: 1px solid rgba(0, 220, 255, 0.3);
-    color: #00e5ff;
-    font-size: 12px;
-    font-weight: bold;
-    letter-spacing: 2px;
-    text-transform: uppercase;
+.hud-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--panel-border);
 }
 
-#telemetry-panel .row {
+.status-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--accent-green);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent-green);
+    animation: status-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--accent-green); }
+    50% { opacity: 0.45; box-shadow: 0 0 14px var(--accent-green); }
+}
+
+.hud-title {
+    flex: 1;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent-cyan);
+}
+
+.hud-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--text-label);
+    padding: 2px 6px;
+    border: 1px solid rgba(94, 124, 154, 0.4);
+    border-radius: 3px;
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 22px;
+}
+
+.metric {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.metric-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--text-label);
+}
+
+.metric-row {
     display: flex;
     align-items: baseline;
-    justify-content: space-between;
-    padding: 3px 0;
+    gap: 5px;
+    overflow: hidden;
 }
 
-#telemetry-panel .label {
-    color: #6ea8c4;
-    font-weight: bold;
-    width: 40px;
+.metric-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent-cyan);
+    text-shadow: 0 0 14px rgba(0, 229, 255, 0.35);
+    line-height: 1;
+    transition: color 0.3s ease, text-shadow 0.3s ease;
 }
 
-#telemetry-panel .value {
-    flex: 1;
-    text-align: right;
-    color: #ffffff;
-    font-weight: bold;
-    text-shadow: 0 0 6px rgba(0, 220, 255, 0.5);
-}
-
-#telemetry-panel .unit {
-    width: 36px;
-    text-align: right;
-    color: #6ea8c4;
-    font-size: 11px;
-}
-
-#telemetry-panel .selector-row {
-    margin: 0 0 10px 0;
-    pointer-events: auto;
-}
-
-#telemetry-panel #satellite-selector {
-    width: 100%;
-    background: rgba(0, 20, 35, 0.85);
-    color: #d6f1ff;
-    border: 1px solid rgba(0, 220, 255, 0.4);
-    border-radius: 3px;
-    padding: 5px 6px;
-    font-family: 'Courier New', Consolas, 'Lucida Console', monospace;
+.metric-unit {
+    font-family: 'Rajdhani', sans-serif;
     font-size: 12px;
-    letter-spacing: 0.5px;
-    outline: none;
-    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-transform: lowercase;
 }
 
-#telemetry-panel #satellite-selector:focus {
-    border-color: #00e5ff;
-    box-shadow: 0 0 6px rgba(0, 220, 255, 0.5);
+.los-card {
+    margin-top: 18px;
+    padding: 12px 14px;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
-#telemetry-panel #satellite-selector option {
-    background: #06121c;
-    color: #d6f1ff;
+.los-heading {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--text-label);
 }
 
-#telemetry-panel .los-row {
-    margin-top: 6px;
-    padding-top: 6px;
-    border-top: 1px solid rgba(0, 220, 255, 0.2);
+#tel-los {
+    font-family: 'Space Mono', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    transition: color 0.3s ease, text-shadow 0.3s ease;
 }
 
-#telemetry-panel .value.los-acquired {
-    color: #00ff7e;
-    text-shadow: 0 0 6px rgba(0, 255, 120, 0.6);
+#tel-los.los-acquired {
+    color: var(--accent-green);
+    text-shadow: 0 0 10px rgba(0, 255, 157, 0.6);
 }
 
-#telemetry-panel .value.los-blocked {
-    color: #ff5555;
-    text-shadow: 0 0 6px rgba(255, 80, 80, 0.5);
+#tel-los.los-blocked {
+    color: var(--accent-red);
+    text-shadow: 0 0 10px rgba(255, 69, 100, 0.5);
 }
 
-#telemetry-panel .value.los-na {
-    color: #888;
+#tel-los.los-na {
+    color: var(--text-dim);
     text-shadow: none;
 }
 
-#category-panel {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    z-index: 1000;
+/* ============= CONTROL PANEL ============= */
+#control-panel {
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+}
+
+.ctrl-section {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 14px 16px;
-    background: rgba(8, 14, 22, 0.78);
-    border: 1px solid rgba(0, 220, 255, 0.45);
-    border-radius: 4px;
-    box-shadow: 0 0 18px rgba(0, 180, 255, 0.18), inset 0 0 12px rgba(0, 100, 160, 0.15);
-    font-family: 'Courier New', Consolas, 'Lucida Console', monospace;
-    backdrop-filter: blur(2px);
 }
 
-#category-panel .cat-label {
-    color: #00e5ff;
-    font-size: 11px;
-    font-weight: bold;
-    letter-spacing: 2px;
+.ctrl-section-select {
+    min-width: 240px;
+}
+
+.ctrl-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 3px;
     text-transform: uppercase;
-    padding-bottom: 6px;
-    border-bottom: 1px solid rgba(0, 220, 255, 0.3);
-    margin-bottom: 4px;
+    color: var(--text-label);
 }
 
-#category-panel .cat-btn {
-    background: rgba(0, 20, 35, 0.85);
-    color: #d6f1ff;
-    border: 1px solid rgba(0, 220, 255, 0.4);
-    border-radius: 3px;
-    padding: 8px 14px;
-    font-family: inherit;
+.ctrl-divider {
+    width: 1px;
+    height: 50px;
+    background: linear-gradient(to bottom,
+        transparent,
+        var(--panel-border),
+        transparent);
+}
+
+.ctrl-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+#category-panel {
+    position: static;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 0;
+}
+
+.cat-btn {
+    background: rgba(0, 30, 50, 0.5);
+    color: var(--text-bright);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-family: 'Rajdhani', sans-serif;
     font-size: 12px;
-    letter-spacing: 1px;
+    font-weight: 600;
+    letter-spacing: 1.8px;
     text-transform: uppercase;
     cursor: pointer;
-    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s;
     outline: none;
+    transition: var(--transition-default);
 }
 
-#category-panel .cat-btn:hover {
-    border-color: #00e5ff;
-    color: #ffffff;
-    box-shadow: 0 0 10px rgba(0, 220, 255, 0.6), inset 0 0 6px rgba(0, 220, 255, 0.2);
+.cat-btn:hover:not(:disabled) {
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    background: rgba(0, 229, 255, 0.08);
+    box-shadow: 0 0 14px rgba(0, 229, 255, 0.3),
+                inset 0 0 8px rgba(0, 229, 255, 0.1);
+    transform: translateY(-1px);
 }
 
-#category-panel .cat-btn:active {
-    background: rgba(0, 60, 90, 0.85);
+.cat-btn:active {
+    transform: translateY(0);
 }
 
-#category-panel .cat-btn.active {
-    background: rgba(0, 80, 120, 0.85);
-    border-color: #00e5ff;
-    color: #ffffff;
-    box-shadow: 0 0 10px rgba(0, 220, 255, 0.5);
+.cat-btn.active {
+    background: rgba(0, 229, 255, 0.15);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.4),
+                inset 0 0 6px rgba(0, 229, 255, 0.15);
 }
 
-#category-panel .cat-btn:disabled {
-    opacity: 0.4;
+.cat-btn:disabled {
+    opacity: 0.45;
     cursor: wait;
+    transform: none;
+    box-shadow: none;
+}
+
+#satellite-selector {
+    width: 100%;
+    padding: 10px 36px 10px 14px;
+    background-color: rgba(0, 30, 50, 0.5);
+    color: var(--text-bright);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2710%27%20height%3D%276%27%20viewBox%3D%270%200%2010%206%27%3E%3Cpath%20fill%3D%27%2300e5ff%27%20d%3D%27M0%200l5%206%205-6z%27%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    transition: var(--transition-default);
+}
+
+#satellite-selector:hover:not(:disabled) {
+    border-color: var(--accent-cyan-soft);
+    background-color: rgba(0, 229, 255, 0.06);
+}
+
+#satellite-selector:focus {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
+}
+
+#satellite-selector:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+#satellite-selector option {
+    background: #050811;
+    color: var(--text-bright);
+    font-family: 'Space Mono', monospace;
+    padding: 8px;
+}
+
+/* ============= Responsive nudges ============= */
+@media (max-width: 720px) {
+    #telemetry-panel {
+        width: calc(100% - 32px);
+        left: 16px;
+        right: 16px;
+        top: 16px;
+    }
+
+    #control-panel {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        bottom: 16px;
+        left: 16px;
+        right: 16px;
+        transform: none;
+        padding: 14px 18px;
+    }
+
+    .ctrl-divider {
+        width: 100%;
+        height: 1px;
+        background: linear-gradient(to right,
+            transparent,
+            var(--panel-border),
+            transparent);
+    }
+
+    .ctrl-buttons {
+        flex-wrap: wrap;
+    }
 }
