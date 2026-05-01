@@ -408,7 +408,7 @@ button:focus, input:focus, select:focus {
 }
 
 /* ============= SELECT (Dropdown) ============= */
-#satellite-selector {
+#satellite-selector, #satellite-filter {
     width: 100%;
     padding: 10px 36px 10px 14px;
     background-color: var(--field-bg);
@@ -428,29 +428,29 @@ button:focus, input:focus, select:focus {
     transition: var(--transition-default);
 }
 
-#satellite-selector:hover:not(:disabled) {
+#satellite-selector, #satellite-filter:hover:not(:disabled) {
     border-color: var(--accent-cyan-soft);
     background-color: rgba(0, 255, 255, 0.04);
 }
 
-#satellite-selector:focus {
+#satellite-selector, #satellite-filter:focus {
     border-color: var(--accent-cyan);
     box-shadow: 0 0 10px var(--accent-cyan-glow);
 }
 
-#satellite-selector:disabled {
+#satellite-selector, #satellite-filter:disabled {
     opacity: 0.5;
     cursor: wait;
 }
 
-#satellite-selector option {
+#satellite-selector, #satellite-filter option {
     background: #050811;
     color: var(--text-bright);
     font-family: 'Space Mono', monospace;
     padding: 8px;
 }
 
-#satellite-selector option:disabled {
+#satellite-selector, #satellite-filter option:disabled {
     color: var(--text-label);
 }
 
@@ -543,6 +543,123 @@ button:focus, input:focus, select:focus {
     text-align: right;
     text-shadow: 0 0 6px rgba(0, 255, 255, 0.4);
     text-transform: uppercase;
+}
+
+/* ============= FLIGHT INFO PANEL ============= */
+#flight-info-panel {
+    top: 24px;
+    right: 24px;
+    width: 300px;
+    padding: 16px 18px;
+    user-select: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+#flight-info-panel.hidden {
+    display: none;
+}
+
+#flight-info-panel .info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--panel-border);
+}
+
+#flight-info-panel .info-header-left {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+}
+
+#flight-info-panel .info-tag {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #ff9d00;
+    padding: 2px 6px;
+    border: 1px solid rgba(255, 157, 0, 0.45);
+    border-radius: 3px;
+}
+
+#flight-info-panel .info-callsign {
+    font-family: 'Space Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #ffb84d;
+    text-shadow: 0 0 10px rgba(255, 157, 0, 0.5);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#flight-info-panel .info-close {
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    color: var(--text-dim);
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: var(--transition-default);
+}
+
+#flight-info-panel .info-close:hover {
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+    box-shadow: 0 0 8px rgba(255, 69, 100, 0.45);
+}
+
+#flight-info-panel .info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#flight-info-panel .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 4px 0;
+}
+
+#flight-info-panel .info-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-label);
+    flex-shrink: 0;
+}
+
+#flight-info-panel .info-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-bright);
+    text-align: right;
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.25);
+}
+
+#flight-info-panel .info-unit {
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 11px;
+}
+
+#flight-info-panel .info-sep {
+    color: var(--text-label);
+    margin: 0 4px;
 }
 
 /* ============= RESPONSIVE ============= */

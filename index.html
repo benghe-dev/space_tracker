@@ -68,10 +68,18 @@
         <div class="mc-section mc-controls">
             <div class="ctrl-section">
                 <span class="ctrl-label">Constellation</span>
+                <select id="satellite-filter">
+                    <option value="stations">Space Stations &amp; ISS</option>
+                    <option value="starlink">Starlink</option>
+                    <option value="gps-ops">GPS Operational</option>
+                    <option value="weather">Weather Satellites</option>
+                    <option value="iridium-NEXT">Iridium NEXT</option>
+                </select>
+            </div>
+
+            <div class="ctrl-section">
+                <span class="ctrl-label">Live Tracking</span>
                 <div id="category-panel" class="ctrl-buttons">
-                    <button class="cat-btn" data-category="stations">Stations</button>
-                    <button class="cat-btn" data-category="visual">Brightest</button>
-                    <button class="cat-btn" data-category="gps">GPS</button>
                     <button id="btn-aviation" class="cat-btn cat-btn-aviation" data-category="aviation">Live Aviation (Europe)</button>
                 </div>
             </div>
@@ -97,6 +105,46 @@
             </div>
         </div>
 
+    </div>
+
+    <div id="flight-info-panel" class="glass-panel hidden">
+        <div class="info-header">
+            <div class="info-header-left">
+                <span class="info-tag">FLIGHT</span>
+                <span id="info-callsign" class="info-callsign">--</span>
+            </div>
+            <button id="info-close" class="info-close" type="button" aria-label="Close">&times;</button>
+        </div>
+        <div class="info-grid">
+            <div class="info-row">
+                <span class="info-label">Altitude</span>
+                <span class="info-value">
+                    <span id="info-alt-m">--</span><span class="info-unit"> m</span>
+                    <span class="info-sep">/</span>
+                    <span id="info-alt-ft">--</span><span class="info-unit"> ft</span>
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Ground Speed</span>
+                <span class="info-value">
+                    <span id="info-gs-kt">--</span><span class="info-unit"> kt</span>
+                    <span class="info-sep">/</span>
+                    <span id="info-gs-kmh">--</span><span class="info-unit"> km/h</span>
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Heading</span>
+                <span class="info-value"><span id="info-heading">--</span><span class="info-unit">&deg;</span></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Latitude</span>
+                <span class="info-value"><span id="info-lat">--</span><span class="info-unit">&deg;</span></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Longitude</span>
+                <span class="info-value"><span id="info-lon">--</span><span class="info-unit">&deg;</span></span>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>

@@ -22,12 +22,17 @@ viewer.scene.globe.depthTestAgainstTerrain = true;
 viewer.scene.screenSpaceCameraController.maximumZoomDistance = 50000000;
 viewer.scene.screenSpaceCameraController.minimumZoomDistance = 100;
 
-const CATEGORY_URLS = {
-    stations: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle',
-    visual: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=tle',
-    gps: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=gps-ops&FORMAT=tle'
+const CONSTELLATION_GROUPS = ['stations', 'starlink', 'gps-ops', 'weather', 'iridium-NEXT'];
+
+const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+
+const tleUrl = (group) => {
+    if (isLocal) {
+        return `https://celestrak.org/NORAD/elements/gp.php?GROUP=${encodeURIComponent(group)}&FORMAT=tle`;
+    }
+    return `/api/telemetry?group=${encodeURIComponent(group)}`;
 };
-const AVIATION_URL = '/api/flights'; // '/api/flights' deployed, 'https://api.adsb.lol/v2/lat/47/lon/10/dist/2500' local
+const AVIATION_URL = 'https://api.adsb.lol/v2/lat/47/lon/10/dist/2500'; // '/api/flights' deployed, 'https://api.adsb.lol/v2/lat/47/lon/10/dist/2500' local
 const AVIATION_REFRESH_MS = 100;
 const DEFAULT_CATEGORY = 'stations';
 
@@ -60,6 +65,20 @@ const satSearchInput = document.getElementById('sat-search');
 const cameraLockBtn = document.getElementById('camera-lock-btn');
 const orbitSlider = document.getElementById('orbit-slider');
 const orbitSliderValue = document.getElementById('orbit-slider-value');
+const satelliteFilter = document.getElementById('satellite-filter');
+
+const flightInfoPanel = document.getElementById('flight-info-panel');
+const infoCallsign = document.getElementById('info-callsign');
+const infoAltM = document.getElementById('info-alt-m');
+const infoAltFt = document.getElementById('info-alt-ft');
+const infoGsKt = document.getElementById('info-gs-kt');
+const infoGsKmh = document.getElementById('info-gs-kmh');
+const infoHeading = document.getElementById('info-heading');
+const infoLat = document.getElementById('info-lat');
+const infoLon = document.getElementById('info-lon');
+const infoCloseBtn = document.getElementById('info-close');
+
+let activeFlightEntity = null;
 
 let groundStationGd = null;
 let groundStationCartesian = null;
@@ -450,6 +469,8 @@ function clearCurrentConstellation() {
     currentSatIndex = -1;
     satEntity.label.text = '';
     footprintEntity.show = false;
+    hideFlightInfo();
+    viewer.trackedEntity = undefined;
 
     if (isCameraLocked) {
         viewer.trackedEntity = undefined;
@@ -539,7 +560,7 @@ async function fetchSatelliteData(url) {
 }
 
 function createAviationEntity(plane) {
-    return viewer.entities.add({
+    const entity = viewer.entities.add({
         position: Cesium.Cartesian3.fromDegrees(plane.longitude, plane.latitude, plane.altitude),
         point: {
             pixelSize: 6,
@@ -549,12 +570,17 @@ function createAviationEntity(plane) {
         },
         label: {
             text: plane.callsign,
-            font: '12px Rajdhani',
+            font: '11px Rajdhani',
             fillColor: Cesium.Color.ORANGE,
-            pixelOffset: new Cesium.Cartesian2(0, -15),
+            pixelOffset: new Cesium.Cartesian2(0, 20),
+            showBackground: true,
+            backgroundColor: new Cesium.Color(0, 0, 0, 0.55),
             distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 500000)
         }
     });
+
+    entity.flightData = plane.raw || plane;
+    return entity;
 }
 
 function updateAviationHUD(metadata) {
@@ -581,16 +607,17 @@ async function fetchAviationData() {
 
         if (currentDomain !== 'AVIATION') return;
 
-        const planes = data.ac.map((plane) => {
-            if (plane.lat == null || plane.lon == null) return null;
+        const planes = data.ac.map((rawPlane) => {
+            if (rawPlane.lat == null || rawPlane.lon == null) return null;
             return {
-                icao24: String(plane.hex || `${plane.lat}-${plane.lon}`),
-                callsign: plane.flight ? plane.flight.trim() : 'UNKNOWN',
-                longitude: plane.lon,
-                latitude: plane.lat,
-                altitude: (Number(plane.alt_baro) || 0) * 0.3048,
-                velocity: Number(plane.gs) || 0,
-                heading: Number(plane.track) || 0
+                icao24: String(rawPlane.hex || `${rawPlane.lat}-${rawPlane.lon}`),
+                callsign: rawPlane.flight ? rawPlane.flight.trim() : 'UNKNOWN',
+                longitude: rawPlane.lon,
+                latitude: rawPlane.lat,
+                altitude: (Number(rawPlane.alt_baro) || 0) * 0.3048,
+                velocity: Number(rawPlane.gs) || 0,
+                heading: Number(rawPlane.track) || 0,
+                raw: rawPlane
             };
         }).filter(Boolean);
 
@@ -609,7 +636,11 @@ async function fetchAviationData() {
                 existing.metadata = plane;
                 existing.name = plane.callsign;
                 existing.entity.position = Cesium.Cartesian3.fromDegrees(plane.longitude, plane.latitude, plane.altitude);
+                existing.entity.flightData = plane.raw || plane;
                 if (existing.entity.label) existing.entity.label.text = plane.callsign;
+                if (activeFlightEntity === existing.entity) {
+                    showFlightInfo(existing.entity.flightData);
+                }
                 updatedDb.push(existing);
             } else {
                 updatedDb.push({
@@ -654,6 +685,12 @@ async function loadCategory(categoryKey) {
         btn.disabled = true;
         btn.classList.toggle('active', btn.dataset.category === categoryKey);
     });
+    if (satelliteFilter) {
+        satelliteFilter.disabled = true;
+        if (CONSTELLATION_GROUPS.includes(categoryKey) && satelliteFilter.value !== categoryKey) {
+            satelliteFilter.value = categoryKey;
+        }
+    }
 
     try {
         if (categoryKey === 'aviation') {
@@ -665,26 +702,74 @@ async function loadCategory(categoryKey) {
             footprintEntity.show = false;
             await fetchAviationData();
             aviationUpdateInterval = setInterval(fetchAviationData, AVIATION_REFRESH_MS);
+        } else if (CONSTELLATION_GROUPS.includes(categoryKey)) {
+            await fetchSatelliteData(tleUrl(categoryKey));
         } else {
-            const url = CATEGORY_URLS[categoryKey];
-            if (!url) return;
-            await fetchSatelliteData(url);
+            console.warn(`Unknown category: ${categoryKey}`);
         }
     } catch (err) {
         console.error('Errore caricamento dataset:', err);
         satelliteSelector.innerHTML = '<option>Error loading data</option>';
     } finally {
         categoryButtons.forEach(btn => { btn.disabled = false; });
+        if (satelliteFilter) satelliteFilter.disabled = false;
     }
 }
+
+function showFlightInfo(plane) {
+    if (!plane) return;
+    const callsign = plane.flight ? String(plane.flight).trim() : (plane.r || plane.hex || 'UNKNOWN');
+    infoCallsign.textContent = callsign || 'UNKNOWN';
+
+    const altFt = Number(plane.alt_baro) || 0;
+    const altM = Math.round(altFt * 0.3048);
+    infoAltM.textContent = altM.toLocaleString('en-US');
+    infoAltFt.textContent = Math.round(altFt).toLocaleString('en-US');
+
+    const gsKt = Number(plane.gs) || 0;
+    infoGsKt.textContent = Math.round(gsKt).toLocaleString('en-US');
+    infoGsKmh.textContent = Math.round(gsKt * 1.852).toLocaleString('en-US');
+
+    infoHeading.textContent = (Number(plane.track) || 0).toFixed(0);
+    infoLat.textContent = Number(plane.lat).toFixed(4);
+    infoLon.textContent = Number(plane.lon).toFixed(4);
+
+    flightInfoPanel.classList.remove('hidden');
+}
+
+function hideFlightInfo() {
+    flightInfoPanel.classList.add('hidden');
+    activeFlightEntity = null;
+}
+
+infoCloseBtn.addEventListener('click', () => {
+    hideFlightInfo();
+    viewer.trackedEntity = undefined;
+});
 
 function setupClickHandler() {
     const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
     handler.setInputAction((click) => {
         const picked = viewer.scene.pick(click.position);
-        if (Cesium.defined(picked) && picked.id && typeof picked.id.satIndex === 'number') {
-            selectSatellite(picked.id.satIndex);
+        if (Cesium.defined(picked) && picked.id) {
+            const entity = picked.id;
+            if (entity.flightData) {
+                activeFlightEntity = entity;
+                showFlightInfo(entity.flightData);
+                viewer.trackedEntity = entity;
+                if (typeof entity.satIndex === 'number') {
+                    selectSatellite(entity.satIndex);
+                }
+                return;
+            }
+            if (typeof entity.satIndex === 'number') {
+                hideFlightInfo();
+                selectSatellite(entity.satIndex);
+                return;
+            }
         }
+        hideFlightInfo();
+        viewer.trackedEntity = undefined;
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 }
 
@@ -701,6 +786,13 @@ function setupClickHandler() {
     categoryButtons.forEach(btn => {
         btn.addEventListener('click', () => loadCategory(btn.dataset.category));
     });
+
+    if (satelliteFilter) {
+        satelliteFilter.value = DEFAULT_CATEGORY;
+        satelliteFilter.addEventListener('change', (e) => {
+            loadCategory(e.target.value);
+        });
+    }
 
     satSearchInput.addEventListener('input', (e) => {
         currentSearchQuery = e.target.value;

@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron",
+      "schedule": "*/15 * * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/flights",
