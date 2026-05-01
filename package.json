@@ -6,6 +6,9 @@
   "engines": {
     "node": ">=18"
   },
+  "scripts": {
+    "build": "echo 'No build necessary, go ahead Vercel!'"
+  },
   "dependencies": {
     "@vercel/kv": "^1.0.1"
   }
