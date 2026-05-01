@@ -10,6 +10,6 @@
     "build": "echo 'No build necessary, go ahead Vercel!'"
   },
   "dependencies": {
-    "@vercel/kv": "^1.0.1"
+    "redis": "^5.12.1"
   }
 }

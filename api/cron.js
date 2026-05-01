@@ -1,4 +1,4 @@
-import { kv } from '@vercel/kv';
+import { createClient } from 'redis';
 
 const GROUPS = ['stations', 'starlink', 'gps-ops', 'weather', 'iridium-NEXT'];
 
@@ -14,34 +14,51 @@ export default async function handler(req, res) {
         }
     }
 
-    const results = {};
+    const client = createClient({
+        url: process.env.REDIS_URL
+    });
 
-    for (const group of GROUPS) {
-        try {
-            const upstream = await fetch(celestrakUrl(group));
-            if (!upstream.ok) {
-                results[group] = `error: HTTP ${upstream.status}`;
-                continue;
+    client.on('error', (err) => console.error('Redis Client Error', err));
+
+    try {
+        await client.connect();
+
+        const results = {};
+
+        for (const group of GROUPS) {
+            try {
+                const upstream = await fetch(celestrakUrl(group));
+                if (!upstream.ok) {
+                    results[group] = `error: HTTP ${upstream.status}`;
+                    continue;
+                }
+                const text = await upstream.text();
+                if (!text || text.length < 50) {
+                    results[group] = 'error: empty or malformed response';
+                    continue;
+                }
+
+                await client.set(`tle:${group}`, text, { EX: 7200 });
+                await client.set(`tle:${group}:updated`, new Date().toISOString(), { EX: 7200 });
+
+                const lineCount = text.split('\n').filter((l) => l.trim().length > 0).length;
+                results[group] = `ok (${Math.floor(lineCount / 3)} satellites)`;
+            } catch (err) {
+                results[group] = `error: ${err.message}`;
             }
-            const text = await upstream.text();
-            if (!text || text.length < 50) {
-                results[group] = 'error: empty or malformed response';
-                continue;
-            }
+        }
 
-            await kv.set(`tle:${group}`, text, { ex: 7200 });
-            await kv.set(`tle:${group}:updated`, new Date().toISOString(), { ex: 7200 });
-
-            const lineCount = text.split('\n').filter(l => l.trim().length > 0).length;
-            results[group] = `ok (${Math.floor(lineCount / 3)} satellites)`;
-        } catch (err) {
-            results[group] = `error: ${err.message}`;
+        res.status(200).json({
+            ok: true,
+            timestamp: new Date().toISOString(),
+            results
+        });
+    } catch (error) {
+        console.error('Serverless Function Error:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    } finally {
+        if (client.isOpen) {
+            await client.quit();
         }
     }
-
-    return res.status(200).json({
-        ok: true,
-        timestamp: new Date().toISOString(),
-        results
-    });
 }
